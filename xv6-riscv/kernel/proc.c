@@ -5,7 +5,7 @@
 #include "spinlock.h"
 #include "proc.h"
 #include "defs.h"
-#include "levelList.h"
+#include "mlf.h"
 #include <stdio.h>
 
 struct cpu cpus[NCPU];
@@ -14,10 +14,7 @@ struct proc proc[NPROC];
 
 struct proc *initproc;
 
-struct level *level1;
-struct level *level2;
-struct level *level3;
-struct level *level4;
+struct mlf *mlf;
 
 int nextpid = 1;
 struct spinlock pid_lock;
@@ -466,32 +463,17 @@ scheduler(void)
   for(;;){
     // Avoid deadlock by ensuring that devices can interrupt.
     intr_on();
-    p = checkAging();
+    p = dequeuMlf(mlf);          
     if (p != NULL){
-      acquire(&p->lock);
-    } else if(level1->head != NULL){
-        p = levelPop(level1);
-        acquire(&p->lock);
-        } else if(level2->head != NULL){
-            p = levelPop(level1);
-        acquire(&p->lock);
-            } else if(level3->head != NULL){
-              p = levelPop(level1);
-              acquire(&p->lock);
-              } else if(level4->head != NULL){
-                p = levelPop(level1);
-                acquire(&p->lock);
-                }
-      if (p != NULL){
-      p->state = RUNNING;
-      p->lastTimeScheduled = ticks;
-      c->proc = p;
-      swtch(&c->context, &p->context);
+    p->state = RUNNING;
+    p->lastTimeScheduled = ticks;
+    c->proc = p;
+    swtch(&c->context, &p->context);
 
-      // Process is done running for now.
-      // It should have changed its p->state before coming back.
-      p->tiks = 0;
-      c->proc = 0;
+    // Process is done running for now.
+    // It should have changed its p->state before coming back.
+    p->tiks = 0;
+    c->proc = 0;
     release(&p->lock);
     }
   } 

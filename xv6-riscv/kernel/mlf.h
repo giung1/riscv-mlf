@@ -24,4 +24,8 @@
 
   void enqueue(struct queue *queue, struct proc proc);
 
-  struct proc* dequeu(struct queue *queue);
+  struct proc* dequeue(struct queue *queue);
+
+  void enqueueMlf( struct mlf *mlf, struct proc proc, int level);
+
+  struct proc* dequeuMlf(struct mlf *mlf);
