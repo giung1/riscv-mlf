@@ -7,15 +7,21 @@
     struct node *next; 
 }node; 
   
-  struct level {
-
+  struct queue 
+  {
     struct node *head;
     
     struct node *last;
   
     int size;
-  }level;
+  }queue;
 
-  void insertNode(struct level *level, struct proc proc);
+  struct mlf
+  {
+    struct queue mlf[4];
+  };
+  
 
-  struct proc* levelPop(struct level *level);
+  void enqueue(struct queue *queue, struct proc proc);
+
+  struct proc* dequeu(struct queue *queue);
