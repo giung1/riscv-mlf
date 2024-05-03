@@ -106,6 +106,7 @@ struct proc {
   struct inode *cwd;           // Current directory
   char name[16];               // Process name (debugging)
   int tiks;		                 // Number of proces's ticks 
-  int QUANTUM;                 // Process quantum
-  int tiksInYield;
+  int lastTimeScheduled;       
 };
+
+  void checkAging();

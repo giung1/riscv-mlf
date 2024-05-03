@@ -1,11 +1,10 @@
-#include "proc.h"
 
   struct node 
-{ 
-    struct proc proc; 
+  { 
+    struct proc *proc; 
   
     struct node *next; 
-}node; 
+  }node; 
   
   struct queue 
   {
@@ -13,19 +12,21 @@
     
     struct node *last;
   
-    int size;
+    struct spinlock lock;
+
   }queue;
 
   struct mlf
   {
-    struct queue mlf[4];
+    struct queue levels[MAXLEVEL];
   };
   
 
-  void enqueue(struct queue *queue, struct proc proc);
+  void enqueue(struct queue *queue, struct proc *proc);
 
   struct proc* dequeue(struct queue *queue);
 
-  void enqueueMlf( struct mlf *mlf, struct proc proc, int level);
+  void enqueueMlf( struct mlf *mlf, struct proc *proc);
 
-  struct proc* dequeuMlf(struct mlf *mlf);
+  struct proc* dequeueMlf(struct mlf *mlf);
+  

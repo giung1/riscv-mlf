@@ -91,8 +91,16 @@ sys_uptime(void)
 }
 
 uint64
-sys_setPriority(void){
+sys_setpriority(void)
+{
   int value;
   argint(0,&value);
-  setPriority(value);
+    if (value < 1 || value > 4){
+      printf("Invalid level of priority");
+      return -1;
+    } else{
+      struct proc *p = myproc();
+      p->level = value;
+    }
+    return 0;
 }

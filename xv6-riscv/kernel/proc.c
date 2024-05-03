@@ -6,7 +6,6 @@
 #include "proc.h"
 #include "defs.h"
 #include "mlf.h"
-#include <stdio.h>
 
 struct cpu cpus[NCPU];
 
@@ -21,6 +20,7 @@ struct spinlock pid_lock;
 
 extern void forkret(void);
 static void freeproc(struct proc *p);
+void makeRunnable(struct proc *p, int offset);
 
 extern char trampoline[]; // trampoline.S
 
@@ -463,18 +463,18 @@ scheduler(void)
   for(;;){
     // Avoid deadlock by ensuring that devices can interrupt.
     intr_on();
-    p = dequeuMlf(mlf);          
-    if (p != NULL){
-    p->state = RUNNING;
-    p->lastTimeScheduled = ticks;
-    c->proc = p;
-    swtch(&c->context, &p->context);
+    p = dequeueMlf(mlf);          
+    if (p){
+      p->state = RUNNING;
+      p->lastTimeScheduled = ticks;
+      c->proc = p;
+      swtch(&c->context, &p->context);
 
-    // Process is done running for now.
-    // It should have changed its p->state before coming back.
-    p->tiks = 0;
-    c->proc = 0;
-    release(&p->lock);
+      // Process is done running for now.
+      // It should have changed its p->state before coming back.
+      p->tiks = 0;
+      c->proc = 0;
+      release(&p->lock);
     }
   } 
 }
@@ -691,61 +691,31 @@ procdump(void)
   }
 }
 
+void makeRunnable(struct proc *p, int offset)
+{
+  acquire(&p->lock);
+  p->state = RUNNABLE;
+  p->level = p->level + offset;
 
-  void makeRunnable(struct proc *p, int offset){
-    acquire(&p->lock);
-    p->state = RUNNABLE;
-    p->level = p->level + offset;
-
-    if(p->level < 1){
-      p->level = 1;
-    }
-    if(p->level > 4){
-      p->level = 4;
-    }
-
-    p->QUANTUM = p->level;
-
-    switch (p->level)
-      {
-      case (1):
-        insertNode(level1,*p);
-        break;
-      case (2):
-        insertNode(level2,*p);
-        break;
-      case (3):
-        insertNode(level3,*p);
-        break;
-      case (4):
-        insertNode(level4,*p);
-        break;
-      default:
-        panic('invalid priority level');
-        break;
-      }
-
-    release(&p->lock);
+  if(p->level < 1){
+    p->level = 1;
   }
-  
-
-  void 
-  setPriority(int value){
-    struct proc *p = myproc();
-    acquire(&p->lock);
-    p->level = value;
-    release(&p->lock);
+  if(p->level > 4){
+    p->level = 4;
+  }
+  enqueueMlf(mlf,p);
 }
 
 
-struct proc* checkAging(){ //planificarlo o subir prio?
-  int maxAging; 
-  if(ticks - level2->head->proc.lastTimeScheduled > MAXAGE){
-    return levelPop(level2);
-  } else if(ticks - level3->head->proc.lastTimeScheduled > MAXAGE){
-    return levelPop(level3);
-  } else if(ticks - level4->head->proc.lastTimeScheduled > MAXAGE){
-    return levelPop(level4);
-  }
-  return NULL;
+void checkAging(struct mlf *mlf)
+{
+  for (int i = 2; i <= MAXLEVEL; i++){
+    acquire(&mlf->levels[i].lock);
+    if ((ticks - mlf->levels[i].head->proc->lastTimeScheduled) > MAXAGE){
+      proc->level--;
+      release(&mlf->levels[i].lock);
+      break;
+    }
+    release(&mlf->levels[i].lock);
+  } 
 }

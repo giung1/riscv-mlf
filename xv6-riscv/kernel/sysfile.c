@@ -503,12 +503,3 @@ sys_pipe(void)
   }
   return 0;
 }
-
-
-uint64            //preguntar sobre locks y como obtener el valor desde a0
-sys_setpriority(void)
-{
-  int value;
-  argint(0,&value);
-  setPriority(value); //?????
-}

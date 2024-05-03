@@ -1,22 +1,23 @@
-#include "mlf.h"
 #include <stdio.h>
+#include "mlf.h"
 #include "proc.h"
 
-  void enqueue(struct queue *queue, struct proc proc){
+  void enqueue(struct queue *queue, struct proc *proc)
+  {
     struct node *newNode = (struct node *)malloc(sizeof(struct node));
-    newNode->proc = proc;  //preguntar
+    newNode->proc = proc;  
     newNode->next = NULL;
-    if(queue->size == 0){
+    if(!queue->head){
         queue->head = newNode;
         queue->last = newNode;
     } else{
         queue->last->next = newNode;
         queue->last = newNode;
     }
-    queue->size++;
   }
 
-  struct proc* dequeue(struct queue *queue){
+  struct proc* dequeue(struct queue *queue)
+  {
     struct proc *procToReturn;
     struct node *aux;
     procToReturn = &(queue->head)->proc;
@@ -25,23 +26,31 @@
     return procToReturn;
   }
 
-  void enqueueMlf( struct mlf *mlf, struct proc proc, int level){
-    struct proc *p = proc;
+  void enqueueMlf(struct mlf *mlf, struct proc *proc)
+  {
+    struct proc *p = proc;   
     if ( p->state != RUNNABLE ){
-      panic();
+      panic("Process must be runnable");
     } else {
-      acquire(&p->lock);
-      enqueue( mlf[level-1], proc);
+      enqueue( &mlf->levels[p->level], proc);
+      release(&p->lock);
     }
   }
 
-  struct proc* dequeuMlf(struct mlf *mlf){
+  struct proc* dequeueMlf(struct mlf *mlf)
+  {
     struct proc *procToReturn;
-    for (int i = 0; i < 4; i++)
+    for (int i = 1; i <= 4; i++)
     {
-      if( mlf[i+1].size != 0 ){
-        procToReturn = dequeue(mlf[i+1]);
+      if(&mlf->levels[i]){
+        acquire(&mlf->levels[i].lock);  
+        procToReturn = dequeue(&mlf->levels[i]);
+        acquire(&procToReturn->lock);
+        release(&mlf->levels[i].lock);
         return procToReturn;
       }
     }
+    return NULL;
   }
+  
+  

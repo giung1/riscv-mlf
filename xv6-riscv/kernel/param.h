@@ -11,4 +11,5 @@
 #define NBUF         (MAXOPBLOCKS*3)  // size of disk block cache
 #define FSSIZE       2000  // size of file system in blocks
 #define MAXPATH      128   // maximum file path name
-#define QUANTUM 	 3 // clock's numbers of ticks
+#define MAXAGE       50    // maximum numbers of ticks to upgrade process priority level
+#define MAXLEVEL     4     // maximum numbers of mlf levels 
