@@ -5,7 +5,6 @@
 #include "spinlock.h"
 #include "proc.h"
 #include "defs.h"
-#include "mlf.h"
 
 struct cpu cpus[NCPU];
 
@@ -719,3 +718,62 @@ void checkAging(struct mlf *mlf)
     release(&mlf->levels[i].lock);
   } 
 }
+
+void enqueue(struct queue *queue, struct proc *proc)
+  {
+    struct node *newNode = 0;
+    newNode->proc = proc;  
+    newNode->next = 0;
+    if(!queue->head){
+        queue->head = newNode;
+        queue->last = newNode;
+    } else{
+        queue->last->next = newNode;
+        queue->last = newNode;
+    }
+  }
+
+  struct proc* dequeue(struct queue *queue)
+  {
+    struct proc *procToReturn;
+    struct node *aux;
+    if(queue->head != 0){
+      procToReturn = (queue->head)->proc;
+      aux= queue->head;
+      queue->head = aux->next;
+      return procToReturn;
+    }else{
+      return 0;
+    }
+  }
+
+  void enqueueMlf(struct mlf *mlf, struct proc *proc)
+  {
+    struct proc *p = proc;   
+    if ( p->state != RUNNABLE ){
+      panic("Process must be runnable");
+    } else {
+      enqueue( &mlf->levels[p->level], proc);
+      release(&p->lock);
+    }
+  }
+
+  struct proc* dequeueMlf(struct mlf *mlf)
+  {
+    struct proc *procToReturn;
+    struct queue q;
+    for (int i = 0; i < 4; i++)
+    {
+      q = mlf->levels[i];
+      // if(&mlf->levels[i]){
+      acquire(&q.lock);  
+      procToReturn = dequeue(&q);
+      if(procToReturn != 0) {
+        acquire(&procToReturn->lock);
+        release(&mlf->levels[i].lock);
+        return procToReturn;
+      }
+      release(&mlf->levels[i].lock);
+    }
+    return 0;
+  }
