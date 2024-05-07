@@ -95,12 +95,11 @@ sys_setpriority(void)
 {
   int value;
   argint(0,&value);
-    if (value < 1 || value > 4){
-      printf("Invalid level of priority");
-      return -1;
-    } else{
-      struct proc *p = myproc();
-      p->level = value;
-    }
-    return 0;
+  if(value < 0 || value > 3){
+    return -1;
+  } else {
+    struct proc *p = myproc();
+    p->level = value;
+  }
+  return 0;
 }

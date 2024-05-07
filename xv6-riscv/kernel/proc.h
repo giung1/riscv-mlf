@@ -106,39 +106,8 @@ struct proc {
   struct inode *cwd;           // Current directory
   char name[16];               // Process name (debugging)
   int tiks;		                 // Number of proces's ticks 
-  int lastTimeScheduled;       
+  int lastTimeScheduled;       // ?????
+  struct proc *next;           // Next process in mlf list       
 };
 
-  void checkAging();
-  
-  struct node 
-  { 
-    struct proc *proc; 
-  
-    struct node *next; 
-  }; 
-  
-  struct queue 
-  {
-    struct node *head;
-    
-    struct node *last;
-  
-    struct spinlock lock;
-
-  };
-
-  struct mlf
-  {
-    struct queue levels[MAXLEVEL];
-  };
-  
-
-  void enqueue(struct queue *queue, struct proc *proc);
-
-  struct proc* dequeue(struct queue *queue);
-
-  void enqueueMlf( struct mlf *mlf, struct proc *proc);
-
-  struct proc* dequeueMlf(struct mlf *mlf);
-  
+void checkAging();

@@ -78,10 +78,7 @@ usertrap(void)
 
   // give up the CPU if this is a timer interrupt.
   if(which_dev == 2 ){
-      if(ticks % MAXAGE == 0){
-        checkAging();
-      }
-    if (++p->tiks == p->level){
+    if (++p->tiks == p->level+1){
     	yield();
 		}
 	}
@@ -155,15 +152,13 @@ kerneltrap()
     panic("kerneltrap");
   }
 	struct proc *p = myproc();
+  
   // give up the CPU if this is a timer interrupt.
   if(which_dev == 2 && p != 0 && myproc()->state == RUNNING){
-    if(ticks % MAXAGE == 0){
-        checkAging();
-      }
-    if (++p->tiks == p->level){
+    if (++p->tiks == p->level+1){
     	yield();
 		}
-    }
+  }
   // the yield() may have caused some traps to occur,
   // so restore trap registers for use by kernelvec.S's sepc instruction.
   w_sepc(sepc);
@@ -175,6 +170,9 @@ clockintr()
 {
   acquire(&tickslock);
   ticks++;
+  if(ticks % MAXAGE == 0){
+    checkAging();
+  }
   wakeup(&ticks);
   release(&tickslock);
 }
