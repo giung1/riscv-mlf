@@ -20,7 +20,7 @@ struct queue
   struct spinlock lock;
 };
 
-struct queue *mlf[NLEVEL];
+struct queue mlf[NLEVEL];
 
 void enqueue(struct proc *proc);
 struct proc* dequeue(struct queue *level);
@@ -70,6 +70,10 @@ procinit(void)
       p->state = UNUSED;
       p->kstack = KSTACK((int) (p - proc));
       p->next = NULL;
+  }
+  for(int i = 0; i < NLEVEL; i++){
+    mlf[i].head = mlf[i].last = 0;
+    initlock(&mlf[i].lock, "mlf");
   }
 }
 
@@ -139,6 +143,7 @@ allocproc(void)
 found:
   p->pid = allocpid();
   p->state = USED;
+  p->level = 0;
 
   // Allocate a trapframe page.
   if((p->trapframe = (struct trapframe *)kalloc()) == 0){
@@ -265,7 +270,6 @@ userinit(void)
 
   safestrcpy(p->name, "initcode", sizeof(p->name));
   p->cwd = namei("/");
-  p->level = 0;
 
   makeRunnable(p,0);
 
@@ -702,8 +706,8 @@ procdump(void)
 }
 
 void enqueue(struct proc *proc){
-  struct queue *level = mlf[proc->level];
-  if(level->head == NULL){
+  struct queue * level = &mlf[proc->level];
+  if(level->head == 0){
     level->head = proc;
     level->last = proc;
   }else{

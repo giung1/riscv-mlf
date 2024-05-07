@@ -12,4 +12,4 @@
 #define FSSIZE       2000  // size of file system in blocks
 #define MAXPATH      128   // maximum file path name
 #define MAXAGE       50    // maximum numbers of ticks to upgrade process priority level
-#define NLEVEL     4       // number of mlf levels 
+#define NLEVEL       4     // number of mlf levels 
