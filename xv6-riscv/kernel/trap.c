@@ -171,7 +171,7 @@ clockintr()
   acquire(&tickslock);
   ticks++;
   if(ticks % MAXAGE == 0){
-    checkAging();
+    //checkAging();
   }
   wakeup(&ticks);
   release(&tickslock);

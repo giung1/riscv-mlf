@@ -484,7 +484,7 @@ scheduler(void)
         actualLevel = 0;
       } else {
         actualLevel++;
-        if (actualLevel > 3){
+        if (actualLevel > NLEVEL-1){
           actualLevel = 0;
         }
       }
@@ -740,7 +740,7 @@ void makeRunnable(struct proc *p, int offset)
   if(p->level < 0){
     p->level = 0;
   }
-  if(p->level > 3){
+  if(p->level > NLEVEL){
     p->level = 3;
   }
   enqueue(p);  
@@ -753,13 +753,17 @@ void checkAging()
     struct proc *proc; 
     if((ticks - mlf[i].head->lastTimeScheduled) > MAXAGE){
       proc = dequeue(&mlf[i]);
-      proc->level--;
+      acquire(&proc->lock);
+      if(proc->level > 0){
+        proc->level--;
+      }
+      release(&mlf[i].lock);
       enqueue(proc);
       release(&proc->lock);
       release(&mlf[i].lock);
       break;
     }else{
       release(&mlf[i].lock);
-    } 
+    }
   }
 }
