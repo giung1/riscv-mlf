@@ -751,13 +751,12 @@ void checkAging()
   struct proc *proc; 
   for(int i = 1; i < NLEVEL; i++){
     acquire(&mlf[i].lock);
-    proc = dequeue(&mlf[i]);
-    if (proc){
+    if (mlf[i].head){
       if((ticks - mlf[i].head->lastTimeScheduled) > MAXAGE){
+        proc = dequeue(&mlf[i]);
         if(proc->level > 0){
           proc->level--;
         }
-        release(&mlf[i].lock);
         enqueue(proc);
         release(&proc->lock);
         release(&mlf[i].lock);
