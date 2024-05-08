@@ -5,7 +5,6 @@
 #include "spinlock.h"
 #include "proc.h"
 #include "defs.h"
-#include <stdlib.h>
 
 struct cpu cpus[NCPU];
 
@@ -20,17 +19,18 @@ struct queue
   struct spinlock lock;
 };
 
-struct queue mlf[NLEVEL];
+struct queue mlf[4];
 
 void enqueue(struct proc *proc);
 struct proc* dequeue(struct queue *level);
+void makeRunnable(struct proc *p, int offset);
+
 
 int nextpid = 1;
 struct spinlock pid_lock;
 
 extern void forkret(void);
 static void freeproc(struct proc *p);
-void makeRunnable(struct proc *p, int offset);
 
 extern char trampoline[]; // trampoline.S
 
@@ -69,15 +69,6 @@ procinit(void)
       initlock(&p->lock, "proc");
       p->state = UNUSED;
       p->kstack = KSTACK((int) (p - proc));
-      p->next = NULL;
-  }
-
-  struct queue level;
-
-  for(int i = 0; i < NLEVEL; i++){
-    level = mlf[i];
-    level.head = level.last = NULL;
-    initlock(&mlf[i].lock, "mlf");
   }
 }
 
@@ -147,7 +138,6 @@ allocproc(void)
 found:
   p->pid = allocpid();
   p->state = USED;
-  p->level = 0;
 
   // Allocate a trapframe page.
   if((p->trapframe = (struct trapframe *)kalloc()) == 0){
@@ -193,8 +183,6 @@ freeproc(struct proc *p)
   p->killed = 0;
   p->xstate = 0;
   p->state = UNUSED;
-  p->tiks = 0;
-  p->level = 1;
 }
 
 // Create a user page table for a given process, with no user memory,
@@ -345,10 +333,6 @@ fork(void)
   release(&wait_lock);
 
   acquire(&np->lock);
-  np->level = 0;
-  release(&np->lock);
-
-  acquire(&np->lock);
   makeRunnable(np,0);
   release(&np->lock);
 
@@ -416,7 +400,7 @@ exit(int status)
 }
 
 // Wait for a child process to exit and return its pid.
-// Return -1 if this process has nschedo children.
+// Return -1 if this process has no children.
 int
 wait(uint64 addr)
 {
@@ -476,37 +460,34 @@ scheduler(void)
 {
   struct proc *p;
   struct cpu *c = mycpu();
-  int i = 0;
+  int actualLevel = 0;
   c->proc = 0;
-
   for(;;){
-    if (i>3) {
-      i = 0;          //reseting index to loop again
-    }
+    //printf("scheduler %d", actualLevel);
     // Avoid deadlock by ensuring that devices can interrupt.
     intr_on();
-    //if(mlf[i].lock.locked == 1){
-    //  i++;
-    //} else {
-      //acquire(&mlf[i].lock);
-      p = dequeue(&mlf[i]);
-      printf(p->name);
-      //release(&mlf[i].lock);
-      if (p){
-        p->state = RUNNING;
-        p->lastTimeScheduled = ticks;
-        c->proc = p;
-        swtch(&c->context, &p->context);
-        // Process is done running for now.
-        // It should have changed its p->state before coming back.
-        p->tiks = 0;
-        c->proc = 0;
+      acquire(&mlf[actualLevel].lock);
+      p = dequeue(&mlf[actualLevel]);
+      release(&mlf[actualLevel].lock);
+      if(p){
+          // Switch to chosen process.  It is the process's job
+          // to release its lock and then reacquire it
+          // before jumping back to us.
+          p->state = RUNNING;
+          c->proc = p;
+          swtch(&c->context, &p->context);
+
+          // Process is done running for now.
+          // It should have changed its p->state before coming back.
+          c->proc = 0;
         release(&p->lock);
-        i = 0;        // sheduler will star looping from the first level
-      } else {        // we need to go to the next level
-        i++;
+        actualLevel = 0;
+      } else {
+        actualLevel++;
+        if (actualLevel > 3){
+          actualLevel = 0;
+        }
       }
-    //} 
   }
 }
 
@@ -611,7 +592,7 @@ wakeup(void *chan)
     if(p != myproc()){
       acquire(&p->lock);
       if(p->state == SLEEPING && p->chan == chan) {
-        makeRunnable(p,-1);
+        makeRunnable(p,0);
       }
       release(&p->lock);
     }
@@ -734,16 +715,18 @@ void enqueue(struct proc *proc){
 
 struct proc* dequeue(struct queue *level)
 {
-  struct proc *procToReturn = NULL;
-  if (level->head != NULL) {
-    //printf("NO ES NULL\n");
+  struct proc *procToReturn = 0;
+  if (level->head != 0) {
+    if(holding(&level->head->lock)){
+      return 0;
+    }
     procToReturn = level->head;
     acquire(&procToReturn->lock);
     if (procToReturn == level->last) {
-      level->last = NULL;
+      level->last = 0;
     }
     level->head = procToReturn->next;
-    procToReturn->next = NULL;
+    procToReturn->next = 0;
   }
   return procToReturn;
 }
@@ -760,28 +743,23 @@ void makeRunnable(struct proc *p, int offset)
   if(p->level > 3){
     p->level = 3;
   }
-  enqueue(p);
-  // struct proc *pp = dequeue(mlf[p->level]);
-  // if(pp != NULL){
-  //   printf("milanesa napo\n");
-  // }
-  
+  enqueue(p);  
 }
 
 void checkAging()
 {
-  // for(int i = 1; i < NLEVEL; i++){
-  //   acquire(&mlf[i].lock);
-  //   struct proc *proc; 
-  //   if((ticks - mlf[i].head->lastTimeScheduled) > MAXAGE){
-  //     proc = dequeue(&mlf[i]);
-  //     proc->level--;
-  //     enqueue(proc);
-  //     release(&proc->lock);
-  //     release(&mlf[i].lock);
-  //     break;
-  //   }else{
-  //     release(&mlf[i].lock);
-  //   } 
-  // }
+  for(int i = 1; i < NLEVEL; i++){
+    acquire(&mlf[i].lock);
+    struct proc *proc; 
+    if((ticks - mlf[i].head->lastTimeScheduled) > MAXAGE){
+      proc = dequeue(&mlf[i]);
+      proc->level--;
+      enqueue(proc);
+      release(&proc->lock);
+      release(&mlf[i].lock);
+      break;
+    }else{
+      release(&mlf[i].lock);
+    } 
+  }
 }
