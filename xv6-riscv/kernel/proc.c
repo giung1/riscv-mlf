@@ -71,8 +71,12 @@ procinit(void)
       p->kstack = KSTACK((int) (p - proc));
       p->next = NULL;
   }
+
+  struct queue level;
+
   for(int i = 0; i < NLEVEL; i++){
-    mlf[i].head = mlf[i].last = 0;
+    level = mlf[i];
+    level.head = level.last = 0;
     initlock(&mlf[i].lock, "mlf");
   }
 }
@@ -472,12 +476,15 @@ scheduler(void)
 {
   struct proc *p;
   struct cpu *c = mycpu();
-  
+  int i = 0;
   c->proc = 0;
   for(;;){
+    if (i>3) {
+      i = 0;          //reseting index to loop again
+    }
     // Avoid deadlock by ensuring that devices can interrupt.
     intr_on();
-    p = dequeue(*mlf);        
+    p = dequeue(&mlf[i]);        
     if (p){
       p->state = RUNNING;
       p->lastTimeScheduled = ticks;
@@ -489,6 +496,9 @@ scheduler(void)
       p->tiks = 0;
       c->proc = 0;
       release(&p->lock);
+      i = 0;        // sheduler will star looping from the first level
+    } else {        // we need to go to the next level
+      i++;
     }
   } 
 }
@@ -706,33 +716,31 @@ procdump(void)
 }
 
 void enqueue(struct proc *proc){
-  struct queue * level = &mlf[proc->level];
-  if(level->head == 0){
-    level->head = proc;
-    level->last = proc;
+  struct queue level = mlf[proc->level];
+  if(level.head == 0){
+    level.head = proc;
+    level.last = proc;
   }else{
-    level->last->next = proc;
-    level->last = proc;
+    level.last->next = proc;
+    level.last = proc;
   }
 }
 
 struct proc* dequeue(struct queue *level)
 {
-  struct proc *procToReturn;
-  struct proc *aux;
-  if(level->head){
+  struct proc *procToReturn = NULL;
+  if (level != NULL && level->head != NULL) {
     procToReturn = level->head;
     acquire(&procToReturn->lock);
-    aux= level->head;
-    level->head = aux->next;
-    if(!(level->head)){
+    if (procToReturn == level->last) {
       level->last = NULL;
     }
-    return procToReturn;
-  }else{
-    return NULL;
+    level->head = procToReturn->next;
+    procToReturn->next = NULL;
   }
+  return procToReturn;
 }
+
 
 void makeRunnable(struct proc *p, int offset)
 {
@@ -750,41 +758,18 @@ void makeRunnable(struct proc *p, int offset)
 
 void checkAging()
 {
-  for(int i = 1; i < NLEVEL; i++){
-    acquire(&mlf[i]->lock);
-    struct proc *proc = mlf[i]->head; 
-    acquire(&proc->lock);
-    if((ticks - proc->lastTimeScheduled) > MAXAGE){
-      dequeue(mlf[i]);
-      proc->level--;
-      enqueue(proc);
-      release(&proc->lock);
-      release(&mlf[i]->lock);
-      break;
-    }else{
-      release(&proc->lock);
-    }
-    release(&mlf[i]->lock);
-  } 
-}
-
-
-  // struct proc* dequeueMlf(struct mlf *mlf)
-  // {
-  //   struct proc *procToReturn;
-  //   struct queue q;
-  //   for (int i = 0; i < 4; i++)
-  //   {
-  //     q = mlf->levels[i];
-  //     // if(&mlf->levels[i]){
-  //     acquire(&q.lock);  
-  //     procToReturn = dequeue(&q);
-  //     if(procToReturn != 0) {
-  //       release(&q.lock);
-  //       acquire(&procToReturn->lock);
-  //       return procToReturn;
-  //     }
-  //     release(&mlf->levels[i].lock);
-  //   }
-  //   return 0;
+  // for(int i = 1; i < NLEVEL; i++){
+  //   acquire(&mlf[i].lock);
+  //   struct proc *proc; 
+  //   if((ticks - mlf[i].head->lastTimeScheduled) > MAXAGE){
+  //     proc = dequeue(&mlf[i]);
+  //     proc->level--;
+  //     enqueue(proc);
+  //     release(&proc->lock);
+  //     release(&mlf[i].lock);
+  //     break;
+  //   }else{
+  //     release(&mlf[i].lock);
+  //   } 
   // }
+}
