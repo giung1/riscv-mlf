@@ -748,20 +748,23 @@ void makeRunnable(struct proc *p, int offset)
 
 void checkAging()
 {
+  struct proc *proc; 
   for(int i = 1; i < NLEVEL; i++){
     acquire(&mlf[i].lock);
-    struct proc *proc; 
-    if((ticks - mlf[i].head->lastTimeScheduled) > MAXAGE){
-      proc = dequeue(&mlf[i]);
-      acquire(&proc->lock);
-      if(proc->level > 0){
-        proc->level--;
+    proc = dequeue(&mlf[i]);
+    if (proc){
+      if((ticks - mlf[i].head->lastTimeScheduled) > MAXAGE){
+        if(proc->level > 0){
+          proc->level--;
+        }
+        release(&mlf[i].lock);
+        enqueue(proc);
+        release(&proc->lock);
+        release(&mlf[i].lock);
+        break;
+      }else{
+        release(&mlf[i].lock);
       }
-      release(&mlf[i].lock);
-      enqueue(proc);
-      release(&proc->lock);
-      release(&mlf[i].lock);
-      break;
     }else{
       release(&mlf[i].lock);
     }
