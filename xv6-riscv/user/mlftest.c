@@ -9,9 +9,9 @@ main(void)
   for (priority = 1; priority < NLEVEL; priority++) {
     for (j = 0; j < 3; j++) {
       if (fork() == 0) {
-        setpriority(priority - 1);
+        set_priority(priority - 1);
         for(k = 0; k<80000; k++){
-          setpriority(priority - 1);
+          set_priority(priority - 1);
           x++;
         }
         exit(0);

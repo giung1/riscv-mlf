@@ -91,7 +91,7 @@ sys_uptime(void)
 }
 
 uint64
-sys_setpriority(void)
+sys_set_priority(void)
 {
   int value;
   argint(0,&value);
