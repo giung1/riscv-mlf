@@ -466,9 +466,7 @@ scheduler(void)
     //printf("scheduler %d", actualLevel);
     // Avoid deadlock by ensuring that devices can interrupt.
     intr_on();
-      acquire(&mlf[actualLevel].lock);
-      p = dequeue(&mlf[actualLevel]);
-      release(&mlf[actualLevel].lock);
+      p = dequeue(mlf);
       if(p){
           // Switch to chosen process.  It is the process's job
           // to release its lock and then reacquire it
@@ -713,22 +711,27 @@ void enqueue(struct proc *proc){
   }
 }
 
-struct proc* dequeue(struct queue *level)
+struct proc* dequeue(struct queue *mlf)
 {
-  struct proc *procToReturn = 0;
-  if (level->head != 0) {
-    if(holding(&level->head->lock)){
-      return 0;
+  struct queue *level;
+  for (int i = 0; i < NLEVEL; i++){
+    acquire(&mlf[i].lock);
+    level = &mlf[i];
+    struct proc *procToReturn = 0;
+    if (level->head) {
+      procToReturn = level->head;
+      acquire(&procToReturn->lock);
+      if (procToReturn == level->last) {
+        level->last = 0;
+      }
+      level->head = procToReturn->next;
+      procToReturn->next = 0;
+      release(&level->lock);
+      return procToReturn;
     }
-    procToReturn = level->head;
-    acquire(&procToReturn->lock);
-    if (procToReturn == level->last) {
-      level->last = 0;
-    }
-    level->head = procToReturn->next;
-    procToReturn->next = 0;
+    release(&level->lock);
   }
-  return procToReturn;
+  return 0;
 }
 
 
