@@ -460,7 +460,6 @@ scheduler(void)
 {
   struct proc *p;
   struct cpu *c = mycpu();
-  int actualLevel = 0;
   c->proc = 0;
   for(;;){
     //printf("scheduler %d", actualLevel);
@@ -479,12 +478,6 @@ scheduler(void)
           // It should have changed its p->state before coming back.
           c->proc = 0;
         release(&p->lock);
-        actualLevel = 0;
-      } else {
-        actualLevel++;
-        if (actualLevel > NLEVEL-1){
-          actualLevel = 0;
-        }
       }
   }
 }
